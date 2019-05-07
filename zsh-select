@@ -281,16 +281,7 @@ sel-list-input() {
 
     case "$key" in
         ($'\n'|ENTER)
-            if [ "$NLIST_INSTANT_SELECT" = "1" ]; then
-                if [[ "$NLIST_SEARCH_BUFFER" != "" || "$NLIST_IS_UNIQ_MODE" -eq 1 ||
-                    ${NLIST_NONSELECTABLE_ELEMENTS[(r)$current_idx]} != $current_idx ]]
-                then
-                    reply=( $current_idx "SELECT" )
-                fi
-            else
-                search=0
-                _sellist_cursor_visibility 0
-            fi
+            reply=( $current_idx "SELECT" )
             ;;
         ($'\C-L')
             reply=( -1 "REDRAW" )
