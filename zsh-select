@@ -3,29 +3,19 @@
 # Configuration variables:
 # - ZSHSELECT_BOLD
 # - ZSHSELECT_COLOR_PAIR
-# - ZSHSELECT_BORDER
 # - ZSHSELECT_ACTIVE_TEXT
-# - ZSHSELECT_START_IN_SEARCH_MODE
 
 emulate -LR zsh
 setopt extendedglob
 
-# Should the list (text, borders) be drawn in bold
+# Should the list text be drawn in bold
 # Value 1 is the default
-local bold=1
+local bold=0
 [[ "$ZSHSELECT_BOLD" = <-> ]] && bold="$ZSHSELECT_BOLD"
 
 # Main color pair (foreground/background)
 local colorpair="white/black"
 [[ "$ZSHSELECT_COLOR_PAIR" = [[:alnum:]]##/[[:alnum:]]## ]] && colorpair="$ZSHSELECT_COLOR_PAIR"
-
-# Should draw the border?
-local border=0
-[[ "$ZSHSELECT_BORDER" = <-> ]] && border="$ZSHSELECT_BORDER"
-
-# If 1, pressing enter when in search mode will not only
-# leave the mode, but also do selection and leave tool
-local NLIST_INSTANT_SELECT=0
 
 # How should be current element of the list drawn. Possible values: reverse, underline.
 # On Linux virtual terminal this will be enforced to reverse (because of poor
@@ -34,8 +24,7 @@ local NLIST_INSTANT_SELECT=0
 local active_text=reverse
 [[ "$ZSHSELECT_ACTIVE_TEXT" = (reverse|underline) ]] && active_text="$ZSHSELECT_ACTIVE_TEXT"
 
-NLIST_START_IN_SEARCH_MODE=1
-[[ "$ZSHSELECT_START_IN_SEARCH_MODE" = <-> ]] && NLIST_START_IN_SEARCH_MODE="$ZSHSELECT_START_IN_SEARCH_MODE"
+NLIST_IS_SEARCH_MODE=1
 
 #######################################################################################
 
@@ -100,147 +89,81 @@ sel-list-input() {
     # Listening for input
     #
 
-    if [ "$search" = "0" ]; then
-        case "$key" in
-            (UP|k|$'\C-P')
-                # Are there any elements before the current one?
-                [ "$current_idx" -gt 1 ] && current_idx=current_idx-1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (DOWN|j|$'\C-N')
-                # Are there any elements after the current one?
-                [ "$current_idx" -lt "$last_element" ] && current_idx=current_idx+1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (PPAGE|$'\b'|$'\C-?'|BACKSPACE)
-                current_idx=current_idx-page_height
-                [ "$current_idx" -lt 1 ] && current_idx=1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (NPAGE|" ")
-                current_idx=current_idx+page_height
-                [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
-                _sellist_compute_first_to_show_idx
-                ;;
-            ($'\C-U')
-                current_idx=current_idx-page_height/2
-                [ "$current_idx" -lt 1 ] && current_idx=1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            ($'\C-D')
-                current_idx=current_idx+page_height/2
-                [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (HOME|g)
-                current_idx=1
-                _sellist_compute_first_to_show_idx
-                ;;
-            (END|G)
-                current_idx=last_element
-                _sellist_compute_first_to_show_idx
-                ;;
-            ($'\n'|ENTER)
-                # Is that element selectable?
-                # Check for this only when there is no search
-                if [[ "$NLIST_SEARCH_BUFFER" != "" || "$NLIST_IS_UNIQ_MODE" -eq 1 ||
-                    ${NLIST_NONSELECTABLE_ELEMENTS[(r)$current_idx]} != $current_idx ]]
-                then
-                    # Save current element in the result variable
-                    reply=( $current_idx "SELECT" )
-                fi
-                ;;
-            ($'\C-L')
-                reply=( -1 "REDRAW" )
-                ;;
-            ('<'|'{'|LEFT|'h')
-                hscroll=hscroll-7
-                [ "$hscroll" -lt 0 ] && hscroll=0
-                ;;
-            ('>'|'}'|RIGHT|'l')
-                hscroll+=7
-                ;;
-            (*)
-                ;;
-        esac
-    else
-        case "$key" in
-            ($'\n'|ENTER)
-                reply=( $current_idx "SELECT" )
-                ;;
-            ($'\C-L')
-                reply=( -1 "REDRAW" )
-                ;;
-            #
-            # Slightly limited navigation
-            #
+    case "$key" in
+        ($'\n'|ENTER)
+            reply=( $current_idx "SELECT" )
+            ;;
+        ($'\C-L')
+            reply=( -1 "REDRAW" )
+            ;;
+        #
+        # Slightly limited navigation
+        #
 
-            (UP|$'\C-P')
-                [ "$current_idx" -gt 1 ] && current_idx=current_idx-1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (DOWN|$'\C-N')
-                [ "$current_idx" -lt "$last_element" ] && current_idx=current_idx+1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (PPAGE)
-                current_idx=current_idx-page_height
-                [ "$current_idx" -lt 1 ] && current_idx=1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (NPAGE)
-                current_idx=current_idx+page_height
-                [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
-                _sellist_compute_first_to_show_idx
-                ;;
-            ($'\C-U')
-                current_idx=current_idx-page_height/2
-                [ "$current_idx" -lt 1 ] && current_idx=1;
-                _sellist_compute_first_to_show_idx
-                ;;
-            ($'\C-D')
-                current_idx=current_idx+page_height/2
-                [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
-                _sellist_compute_first_to_show_idx
-                ;;
-            (HOME)
-                current_idx=1
-                _sellist_compute_first_to_show_idx
-                ;;
-            (END)
-                current_idx=last_element
-                _sellist_compute_first_to_show_idx
-                ;;
-            (LEFT)
-                hscroll=hscroll-7
-                [ "$hscroll" -lt 0 ] && hscroll=0
-                ;;
-            (RIGHT)
-                hscroll+=7
-                ;;
-            #
-            # The input
-            #
+        (UP|$'\C-P')
+            [ "$current_idx" -gt 1 ] && current_idx=current_idx-1;
+            _sellist_compute_first_to_show_idx
+            ;;
+        (DOWN|$'\C-N')
+            [ "$current_idx" -lt "$last_element" ] && current_idx=current_idx+1;
+            _sellist_compute_first_to_show_idx
+            ;;
+        (PPAGE)
+            current_idx=current_idx-page_height
+            [ "$current_idx" -lt 1 ] && current_idx=1;
+            _sellist_compute_first_to_show_idx
+            ;;
+        (NPAGE)
+            current_idx=current_idx+page_height
+            [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
+            _sellist_compute_first_to_show_idx
+            ;;
+        ($'\C-U')
+            current_idx=current_idx-page_height/2
+            [ "$current_idx" -lt 1 ] && current_idx=1;
+            _sellist_compute_first_to_show_idx
+            ;;
+        ($'\C-D')
+            current_idx=current_idx+page_height/2
+            [ "$current_idx" -gt "$last_element" ] && current_idx=last_element;
+            _sellist_compute_first_to_show_idx
+            ;;
+        (HOME)
+            current_idx=1
+            _sellist_compute_first_to_show_idx
+            ;;
+        (END)
+            current_idx=last_element
+            _sellist_compute_first_to_show_idx
+            ;;
+        (LEFT)
+            hscroll=hscroll-7
+            [ "$hscroll" -lt 0 ] && hscroll=0
+            ;;
+        (RIGHT)
+            hscroll+=7
+            ;;
+        #
+        # The input
+        #
 
-            ($'\b'|$'\C-?'|BACKSPACE)
-                buffer="${buffer%?}"
-                ;;
-            ($'\C-W')
-                [ "$buffer" = "${buffer% *}" ] && buffer="" || buffer="${buffer% *}"
-                ;;
-            ($'\C-K')
-                buffer=""
-                ;;
-            (*)
-                if [[ $#key == 1 && $((#key)) -lt 31 ]]; then
-                    # ignore all other control keys
-                else
-                    buffer+="$key"
-                fi
-                ;;
-        esac
-
-    fi
+        ($'\b'|$'\C-?'|BACKSPACE)
+            buffer="${buffer%?}"
+            ;;
+        ($'\C-W')
+            [ "$buffer" = "${buffer% *}" ] && buffer="" || buffer="${buffer% *}"
+            ;;
+        ($'\C-K')
+            buffer=""
+            ;;
+        (*)
+            if [[ $#key == 1 && $((#key)) -lt 31 ]]; then
+                # ignore all other control keys
+            else
+                buffer+="$key"
+            fi
+            ;;
+    esac
 
     reply[3]="$current_idx"
     reply[4]="$from_what_idx_list_is_shown"
@@ -397,7 +320,7 @@ _sellist_exit() {
 
 # Outputs a message in the bottom of the screen
 _sellist_status_msg() {
-    # -1 for border, -1 for 0-based indexing
+    # -1 for 0-based indexing
     zcurses move main $(( term_height - 1 - 1 )) 2
     zcurses clear main eol
     zcurses string main "$1"
@@ -560,11 +483,6 @@ if [[ -z "$NLIST_REMEMBER_STATE" || "$NLIST_REMEMBER_STATE" -eq 0 || "$NLIST_REM
     [ "$NLIST_REMEMBER_STATE" -eq 2 ] && NLIST_REMEMBER_STATE=1
 fi
 
-if [ "$NLIST_START_IN_SEARCH_MODE" -eq 1 ]; then
-    NLIST_START_IN_SEARCH_MODE=0
-    NLIST_IS_SEARCH_MODE=1
-fi
-
 if [ -n "$NLIST_SET_SEARCH_TO" ]; then
     NLIST_SEARCH_BUFFER="$NLIST_SET_SEARCH_TO"
     NLIST_SET_SEARCH_TO=""
@@ -583,14 +501,10 @@ zcurses addwin main "$term_height" "$term_width" 0 0
 zcurses addwin inner "$inner_height" "$inner_width" 1 2
 # From sel-list.conf
 [ "$colorpair" = "" ] && colorpair="white/black"
-[ "$border" = "0" ] || border="1"
 local background="${colorpair#*/}"
 local backuptheme="$colorpair/$bold"
 zcurses bg main "$colorpair"
 zcurses bg inner "$colorpair"
-if [ "$NLIST_IS_SEARCH_MODE" -ne 1 ]; then
-    _sellist_cursor_visibility 0
-fi
 
 zcurses refresh
 
@@ -785,18 +699,7 @@ while (( 1 )); do
     [ "$NLIST_IS_F_MODE" -eq 1 ] && _txt3="[-FIX-] "
     [ "$NLIST_IS_F_MODE" -eq 2 ] && _txt3="[-FIX2-] "
 
-    if [ "$NLIST_IS_SEARCH_MODE" = "1" ]; then
-        _sellist_status_msg "${_txt2}${_txt3}${keywordmsg}${thememsg}Filtering with: ${NLIST_SEARCH_BUFFER// /+}"
-    elif [[ ${NLIST_NONSELECTABLE_ELEMENTS[(r)$NLIST_CURRENT_IDX]} != $NLIST_CURRENT_IDX ||
-            -n "$NLIST_SEARCH_BUFFER" || "$NLIST_IS_UNIQ_MODE" -eq 1 ]]; then
-        local _txt=""
-        [ -n "$NLIST_GREP_STRING" ] && _txt=" [$NLIST_GREP_STRING]"
-        _sellist_status_msg "${_txt2}${_txt3}${keywordmsg}${thememsg}Current #$NLIST_USER_CURRENT_IDX (of #$NLIST_USER_LAST_ELEMENT entries)$_txt"
-    else
-        _sellist_status_msg "${keywordmsg}${thememsg}"
-    fi
-
-    [ "$border" = "1" ] && zcurses border main
+    _sellist_status_msg "${_txt2}${_txt3}${keywordmsg}${thememsg}Search: ${NLIST_SEARCH_BUFFER// /+}"
 
     local top_msg=${ZSH_SELECT_TITLE:-" ${(C)ZSH_NAME} $ZSH_VERSION, $USER "}
     zcurses move main 0 $(( term_width / 2 - $#top_msg / 2 ))
